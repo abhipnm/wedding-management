@@ -69,6 +69,13 @@ body {
 }
 .btn-secondary:hover { background: #e6dedb; }
 
+.btn-danger {
+  background: #fff;
+  color: var(--declined);
+  border: 1px solid var(--declined);
+}
+.btn-danger:hover { background: var(--declined); color: #fff; }
+
 .dropdown { position: relative; }
 
 .dropdown-menu {
@@ -164,6 +171,7 @@ main {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
@@ -215,7 +223,6 @@ tbody tr:hover { background: #fbf7f6; }
   color: var(--text-muted);
 }
 .row-action:hover { background: var(--bg); }
-.row-action.delete:hover { color: var(--declined); }
 
 .empty-state {
   text-align: center;
@@ -273,6 +280,37 @@ tbody tr:hover { background: #fbf7f6; }
 
 .modal-small { max-width: 380px; }
 
+.relation-list {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+.relation-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.relation-list-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  justify-content: flex-start !important;
+}
+.relation-remove {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+.relation-remove:hover { background: #fbe7ea; color: var(--declined); }
+
 .modal h2 {
   margin-top: 0;
   margin-bottom: 16px;
@@ -286,7 +324,7 @@ tbody tr:hover { background: #fbf7f6; }
   gap: 14px;
 }
 
-#guestForm label {
+.modal label {
   display: flex;
   flex-direction: column;
   font-size: 13px;
@@ -296,10 +334,9 @@ tbody tr:hover { background: #fbf7f6; }
 
 #guestForm .full-width { grid-column: 1 / -1; }
 
-#guestForm input,
-#guestForm select,
-#guestForm textarea,
-.modal select {
+.modal input,
+.modal select,
+.modal textarea {
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -312,11 +349,77 @@ tbody tr:hover { background: #fbf7f6; }
   grid-column: 1 / -1;
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 10px;
   margin-top: 6px;
+  flex-wrap: wrap;
 }
+
+#deleteGuestBtn { margin-right: auto; }
 
 @media (max-width: 720px) {
   .dashboard { grid-template-columns: repeat(2, 1fr); }
   #guestForm { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  .app-header {
+    padding: 12px 16px;
+  }
+  .app-header h1 {
+    font-size: 18px;
+    width: 100%;
+  }
+  .header-actions {
+    width: 100%;
+  }
+  .header-actions .btn,
+  .dropdown {
+    flex: 1;
+  }
+  .header-actions .btn {
+    padding: 10px 8px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .dropdown-menu {
+    left: 0;
+    right: auto;
+    min-width: 100%;
+  }
+
+  main {
+    padding: 14px;
+  }
+
+  .filters {
+    flex-direction: column;
+  }
+  #searchInput,
+  #relationFilter,
+  #addressFilter {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .modal {
+    padding: 18px;
+  }
+  .modal-actions {
+    justify-content: stretch;
+  }
+  .modal-actions .btn {
+    flex: 1;
+    text-align: center;
+  }
+  #deleteGuestBtn {
+    margin-right: 0;
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .invite-checkbox {
+    width: 22px;
+    height: 22px;
+  }
 }

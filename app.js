@@ -40,6 +40,7 @@ const HEADER_ALIASES = {
 };
 
 let guests = [];
+let relations = [];
 let db = null;
 
 function initSupabase() {
@@ -91,6 +92,25 @@ async function loadGuests() {
   clearStatus();
 }
 
+async function loadRelations() {
+  const { data, error } = await db.from("relations").select("*").order("name", { ascending: true });
+  if (error) {
+    showStatus("error", `Couldn't load relations: ${error.message}`);
+    return;
+  }
+  relations = data;
+}
+
+// Union of the managed relations list and whatever's actually on guests
+// (covers imported/legacy data that predates a relation being added here).
+function getAllRelationOptions() {
+  const set = new Set(relations.map((r) => r.name));
+  guests.forEach((g) => {
+    if (g.relation && g.relation.trim() !== "") set.add(g.relation.trim());
+  });
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
+}
+
 function toCount(guest) {
   const n = parseFloat(guest.guestCount);
   return Number.isFinite(n) && n > 0 ? n : 1;
@@ -139,13 +159,32 @@ function getDistinctRelations() {
 function renderRelationFilter() {
   const select = document.getElementById("relationFilter");
   const current = select.value;
-  const relations = getDistinctRelations();
+  const options = getAllRelationOptions();
   select.innerHTML = '<option value="">All Relations</option>' +
-    relations.map((r) => `<option value="${escapeAttr(r)}">${escapeHtml(r)}</option>`).join("");
-  if (relations.includes(current)) select.value = current;
+    options.map((r) => `<option value="${escapeAttr(r)}">${escapeHtml(r)}</option>`).join("");
+  if (options.includes(current)) select.value = current;
+}
 
-  const datalist = document.getElementById("relationOptions");
-  datalist.innerHTML = relations.map((r) => `<option value="${escapeAttr(r)}"></option>`).join("");
+function renderGuestFormRelationOptions(selected) {
+  const select = document.getElementById("fieldRelation");
+  const options = getAllRelationOptions();
+  select.innerHTML = '<option value="">Select a relation…</option>' +
+    options.map((r) => `<option value="${escapeAttr(r)}">${escapeHtml(r)}</option>`).join("");
+  select.value = options.includes(selected) ? selected : "";
+}
+
+function renderRelationList() {
+  const list = document.getElementById("relationList");
+  if (relations.length === 0) {
+    list.innerHTML = '<li class="relation-list-empty">No relations yet.</li>';
+    return;
+  }
+  list.innerHTML = relations.map((r) => `
+    <li data-id="${r.id}">
+      <span>${escapeHtml(r.name)}</span>
+      <button type="button" class="relation-remove" title="Remove">×</button>
+    </li>
+  `).join("");
 }
 
 function getDistinctAddresses() {
@@ -203,8 +242,7 @@ function renderTable() {
       <td>${checkboxCell(g, "barat")}</td>
       <td>${checkboxCell(g, "reception")}</td>
       <td>${escapeHtml(g.notes)}</td>
-      <td><button class="row-action edit" data-action="edit">Edit</button></td>
-      <td><button class="row-action delete" data-action="delete">Delete</button></td>
+      <td><button class="row-action edit" data-action="edit">Edit / Delete</button></td>
     </tr>
   `).join("");
 }
@@ -226,15 +264,28 @@ function openGuestModal(guest) {
   document.getElementById("guestId").value = guest ? guest.id : "";
   document.getElementById("fieldName").value = guest ? guest.name || "" : "";
   document.getElementById("fieldAddress").value = guest ? guest.address || "" : "";
-  document.getElementById("fieldRelation").value = guest ? guest.relation || "" : "";
+  renderGuestFormRelationOptions(guest ? guest.relation || "" : "");
   document.getElementById("fieldRsvp").value = guest ? guest.rsvp || "Pending" : "Pending";
   document.getElementById("fieldGuestCount").value = guest ? guest.guestCount ?? "" : "";
   document.getElementById("fieldCardSent").value = guest ? guest.cardSent || "No" : "No";
   document.getElementById("fieldBarat").value = guest ? guest.barat || "No" : "No";
   document.getElementById("fieldReception").value = guest ? guest.reception || "No" : "No";
   document.getElementById("fieldNotes").value = guest ? guest.notes || "" : "";
+  document.getElementById("deleteGuestBtn").classList.toggle("hidden", !guest);
   guestModal.classList.remove("hidden");
   document.getElementById("fieldName").focus();
+}
+
+async function deleteGuest(id, name) {
+  if (!confirm(`Delete guest "${name}"? This can't be undone.`)) return;
+  const { error } = await db.from("guests").delete().eq("id", id);
+  if (error) {
+    showStatus("error", `Couldn't delete guest: ${error.message}`);
+    return;
+  }
+  guests = guests.filter((g) => g.id !== id);
+  renderAll();
+  closeGuestModal();
 }
 
 function closeGuestModal() {
@@ -245,6 +296,11 @@ function closeGuestModal() {
 document.getElementById("addGuestBtn").addEventListener("click", () => openGuestModal(null));
 document.getElementById("cancelModalBtn").addEventListener("click", closeGuestModal);
 guestModal.addEventListener("click", (e) => { if (e.target === guestModal) closeGuestModal(); });
+document.getElementById("deleteGuestBtn").addEventListener("click", () => {
+  const id = document.getElementById("guestId").value;
+  const guest = guests.find((g) => g.id === id);
+  if (guest) deleteGuest(guest.id, guest.name);
+});
 
 guestForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -283,7 +339,7 @@ guestForm.addEventListener("submit", async (e) => {
   }
 });
 
-document.getElementById("guestTableBody").addEventListener("click", async (e) => {
+document.getElementById("guestTableBody").addEventListener("click", (e) => {
   const btn = e.target.closest("button[data-action]");
   if (!btn) return;
   const row = btn.closest("tr");
@@ -293,16 +349,6 @@ document.getElementById("guestTableBody").addEventListener("click", async (e) =>
 
   if (btn.dataset.action === "edit") {
     openGuestModal(guest);
-  } else if (btn.dataset.action === "delete") {
-    if (confirm(`Delete guest "${guest.name}"?`)) {
-      const { error } = await db.from("guests").delete().eq("id", id);
-      if (error) {
-        showStatus("error", `Couldn't delete guest: ${error.message}`);
-        return;
-      }
-      guests = guests.filter((g) => g.id !== id);
-      renderAll();
-    }
   }
 });
 
@@ -399,16 +445,40 @@ async function importFromWorkbook(workbook) {
     return;
   }
   guests.push(...inserted.map(rowFromDb));
+
+  // Register any relation names the import introduced, so they show up in
+  // the managed list/dropdown too, not just as free text on these rows.
+  const newRelationNames = Array.from(new Set(
+    newGuests.map((g) => g.relation.trim()).filter(Boolean)
+  ));
+  if (newRelationNames.length > 0) {
+    await db.from("relations").upsert(
+      newRelationNames.map((name) => ({ name })),
+      { onConflict: "name", ignoreDuplicates: true }
+    );
+    await loadRelations();
+  }
+
   renderAll();
   alert(`Imported ${inserted.length} guest${inserted.length === 1 ? "" : "s"} from "${sheetName}".`);
 }
 
 // ---------- Export (styled .xlsx via ExcelJS) ----------
+// Layout mirrors the couple's own Google Sheet template: a narrow spacer
+// column, a gold title banner, a bordered stat row with live formulas,
+// then a gold header row and a fully-gridded data table.
 
-const HEADER_FILL = "FFB5495B";
-const STRIPE_FILL = "FFF8F1EF";
-const BORDER_COLOR = "FFE6DEDB";
+const HEADER_FILL = "FF715C0B";
+const TITLE_COLOR = "FF715C0B";
+const BORDER_COLOR = "FF000000";
 const RSVP_COLOR = { accepted: "FF2E7D5B", declined: "FFB5495B", pending: "FFB8860B" };
+
+const SPACER_COL = 1;
+const FIRST_FIELD_COL = 2; // column B
+const TITLE_ROW = 2;
+const STAT_ROW = 5;
+const HEADER_ROW = 7;
+const DATA_START_ROW = 8;
 
 const thinBorder = {
   top: { style: "thin", color: { argb: BORDER_COLOR } },
@@ -421,40 +491,74 @@ function safeSheetName(name) {
   return String(name).replace(/[\\/?*[\]:]/g, " ").slice(0, 31) || "Sheet";
 }
 
+function statCell(sheet, row, col, { text, formula, bold = true } = {}) {
+  const cell = sheet.getCell(row, col);
+  cell.value = formula ? { formula } : text;
+  cell.font = { name: "Arial", bold };
+  cell.border = thinBorder;
+  cell.alignment = { vertical: "top" };
+  return cell;
+}
+
 function addStyledSheet(workbook, name, list) {
   const sheet = workbook.addWorksheet(safeSheetName(name), {
-    views: [{ state: "frozen", ySplit: 1 }],
+    views: [{ state: "frozen", ySplit: HEADER_ROW, showGridLines: false }],
   });
 
-  sheet.columns = FIELDS.map((f) => ({ header: f.label, key: f.key, width: f.width }));
+  sheet.getRow(1).height = 7;
+  sheet.getColumn(SPACER_COL).width = 2.75;
+  FIELDS.forEach((f, i) => { sheet.getColumn(FIRST_FIELD_COL + i).width = f.width; });
 
-  const headerRow = sheet.getRow(1);
-  headerRow.height = 22;
-  headerRow.eachCell((cell) => {
-    cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+  // Title banner
+  sheet.mergeCells(TITLE_ROW, FIRST_FIELD_COL, TITLE_ROW + 1, FIRST_FIELD_COL + 3);
+  const titleCell = sheet.getCell(TITLE_ROW, FIRST_FIELD_COL);
+  titleCell.value = "Wedding Guest List";
+  titleCell.font = { name: "Merriweather", size: 24, color: { argb: TITLE_COLOR } };
+  titleCell.alignment = { vertical: "middle" };
+
+  // Stat row, driven by live formulas over this sheet's own data range
+  const dataEndRow = DATA_START_ROW + Math.max(list.length, 1) - 1;
+  const guestCountCol = FIRST_FIELD_COL + FIELDS.findIndex((f) => f.key === "guestCount");
+  const rsvpCol = FIRST_FIELD_COL + FIELDS.findIndex((f) => f.key === "rsvp");
+  const guestCountLetter = sheet.getColumn(guestCountCol).letter;
+  const rsvpLetter = sheet.getColumn(rsvpCol).letter;
+
+  statCell(sheet, STAT_ROW, FIRST_FIELD_COL, { text: "Total Guests" });
+  statCell(sheet, STAT_ROW, FIRST_FIELD_COL + 2, { formula: `SUM(${guestCountLetter}${DATA_START_ROW}:${guestCountLetter}${dataEndRow})` });
+  statCell(sheet, STAT_ROW, FIRST_FIELD_COL + 3, { text: "RSVPs Confirmed" });
+  statCell(sheet, STAT_ROW, FIRST_FIELD_COL + 4, { formula: `COUNTIF(${rsvpLetter}${DATA_START_ROW}:${rsvpLetter}${dataEndRow},"Accepted")` });
+
+  // Header row
+  FIELDS.forEach((f, i) => {
+    const cell = sheet.getCell(HEADER_ROW, FIRST_FIELD_COL + i);
+    cell.value = f.label;
+    cell.font = { name: "Arial", bold: true, color: { argb: "FFFFFFFF" } };
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEADER_FILL } };
-    cell.alignment = { vertical: "middle", horizontal: "left" };
     cell.border = thinBorder;
+    cell.alignment = { vertical: "top" };
   });
 
+  // Data rows
   list.forEach((g, i) => {
-    const row = sheet.addRow(FIELDS.reduce((acc, f) => { acc[f.key] = g[f.key] ?? ""; return acc; }, {}));
-    row.eachCell((cell) => {
+    const r = DATA_START_ROW + i;
+    FIELDS.forEach((f, ci) => {
+      const cell = sheet.getCell(r, FIRST_FIELD_COL + ci);
+      cell.value = g[f.key] ?? "";
+      cell.font = { name: "Arial" };
       cell.border = thinBorder;
-      cell.alignment = { vertical: "middle" };
+      cell.alignment = { vertical: "top" };
     });
-    if (i % 2 === 1) {
-      row.eachCell((cell) => {
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: STRIPE_FILL } };
-      });
-    }
     const rsvpColor = RSVP_COLOR[(g.rsvp || "").toLowerCase()];
     if (rsvpColor) {
-      row.getCell("rsvp").font = { bold: true, color: { argb: rsvpColor } };
+      sheet.getCell(r, rsvpCol).font = { name: "Arial", bold: true, color: { argb: rsvpColor } };
     }
   });
 
-  sheet.autoFilter = { from: "A1", to: `${sheet.getColumn(FIELDS.length).letter}1` };
+  const lastFieldCol = FIRST_FIELD_COL + FIELDS.length - 1;
+  sheet.autoFilter = {
+    from: `${sheet.getColumn(FIRST_FIELD_COL).letter}${HEADER_ROW}`,
+    to: `${sheet.getColumn(lastFieldCol).letter}${HEADER_ROW}`,
+  };
   return sheet;
 }
 
@@ -545,13 +649,13 @@ exportMenu.addEventListener("click", async (e) => {
 const categoryModal = document.getElementById("categoryModal");
 
 function openCategoryModal() {
-  const relations = getDistinctRelations();
-  if (relations.length === 0) {
+  const relationsWithGuests = getDistinctRelations();
+  if (relationsWithGuests.length === 0) {
     alert("No relations found. Add a relation to at least one guest first.");
     return;
   }
   const select = document.getElementById("categoryExportSelect");
-  select.innerHTML = relations.map((r) => `<option value="${escapeAttr(r)}">${escapeHtml(r)}</option>`).join("");
+  select.innerHTML = relationsWithGuests.map((r) => `<option value="${escapeAttr(r)}">${escapeHtml(r)}</option>`).join("");
   categoryModal.classList.remove("hidden");
 }
 
@@ -563,12 +667,68 @@ document.getElementById("confirmCategoryBtn").addEventListener("click", async ()
   await exportSingleCategory(relation);
 });
 
+// ---------- Relations / categories modal ----------
+
+const relationModal = document.getElementById("relationModal");
+const relationForm = document.getElementById("relationForm");
+
+function openRelationModal() {
+  renderRelationList();
+  relationModal.classList.remove("hidden");
+  document.getElementById("newRelationName").focus();
+}
+function closeRelationModal() {
+  relationModal.classList.add("hidden");
+  relationForm.reset();
+}
+
+document.getElementById("addRelationBtn").addEventListener("click", openRelationModal);
+document.getElementById("closeRelationModalBtn").addEventListener("click", closeRelationModal);
+relationModal.addEventListener("click", (e) => { if (e.target === relationModal) closeRelationModal(); });
+
+relationForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = document.getElementById("newRelationName");
+  const name = input.value.trim();
+  if (!name) return;
+
+  const { data: inserted, error } = await db.from("relations").insert({ name }).select().single();
+  if (error) {
+    showStatus("error", error.code === "23505" ? `"${name}" already exists.` : `Couldn't add relation: ${error.message}`);
+    return;
+  }
+  relations.push(inserted);
+  relations.sort((a, b) => a.name.localeCompare(b.name));
+  input.value = "";
+  renderRelationList();
+  renderRelationFilter();
+});
+
+document.getElementById("relationList").addEventListener("click", async (e) => {
+  const btn = e.target.closest(".relation-remove");
+  if (!btn) return;
+  const li = btn.closest("li");
+  const id = li.dataset.id;
+  const relation = relations.find((r) => r.id === id);
+  if (!relation) return;
+  if (!confirm(`Remove relation "${relation.name}"? Guests already using it keep their value.`)) return;
+
+  const { error } = await db.from("relations").delete().eq("id", id);
+  if (error) {
+    showStatus("error", `Couldn't remove relation: ${error.message}`);
+    return;
+  }
+  relations = relations.filter((r) => r.id !== id);
+  renderRelationList();
+  renderRelationFilter();
+});
+
 // ---------- Init ----------
 
 (async function init() {
   db = initSupabase();
   if (!db) return;
   showStatus("info", "Loading guests…");
-  await loadGuests();
+  await Promise.all([loadGuests(), loadRelations()]);
   renderAll();
 })();

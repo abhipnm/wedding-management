@@ -57,6 +57,7 @@
     <select id="addressFilter">
       <option value="">All Addresses / Cities</option>
     </select>
+    <button id="addRelationBtn" class="btn btn-secondary">+ Relation</button>
   </section>
 
   <section class="table-wrap">
@@ -73,13 +74,12 @@
           <th>Invited for Reception</th>
           <th>Notes</th>
           <th></th>
-          <th></th>
         </tr>
       </thead>
       <tbody id="guestTableBody"></tbody>
     </table>
     <p id="emptyState" class="empty-state hidden">No guests yet. Add a guest or import an Excel file to get started.</p>
-    <p class="table-hint">Tick a checkbox to mark it done right from the list — no need to open Edit.</p>
+    <p class="table-hint">Tick a checkbox to mark it done right from the list. Open Edit / Delete to change details or remove a guest.</p>
   </section>
 </main>
 
@@ -98,8 +98,9 @@
       </label>
 
       <label>Relation
-        <input type="text" id="fieldRelation" list="relationOptions" placeholder="e.g. Family, Friends, Neighbors" />
-        <datalist id="relationOptions"></datalist>
+        <select id="fieldRelation">
+          <option value="">Select a relation…</option>
+        </select>
       </label>
 
       <label>RSVP Status
@@ -140,10 +141,27 @@
       </label>
 
       <div class="modal-actions">
+        <button type="button" id="deleteGuestBtn" class="btn btn-danger hidden">Delete Guest</button>
         <button type="button" id="cancelModalBtn" class="btn btn-secondary">Cancel</button>
         <button type="submit" class="btn btn-primary">Save Guest</button>
       </div>
     </form>
+  </div>
+</div>
+
+<div id="relationModal" class="modal-overlay hidden">
+  <div class="modal modal-small">
+    <h2>Relations / Categories</h2>
+    <form id="relationForm">
+      <label>New relation
+        <input type="text" id="newRelationName" placeholder="e.g. Family, Friends, Neighbors" />
+      </label>
+      <div class="modal-actions">
+        <button type="button" id="closeRelationModalBtn" class="btn btn-secondary">Close</button>
+        <button type="submit" class="btn btn-primary">Add</button>
+      </div>
+    </form>
+    <ul id="relationList" class="relation-list"></ul>
   </div>
 </div>
 
