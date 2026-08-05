@@ -8,6 +8,22 @@
 </head>
 <body>
 
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <h1>Wedding Guest Manager</h1>
+    <p class="login-subtitle">Sign in with your email to see the guests you have access to.</p>
+    <form id="loginForm">
+      <label>Email
+        <input type="email" id="loginEmail" placeholder="you@example.com" required />
+      </label>
+      <button type="submit" class="btn btn-primary">Send Magic Link</button>
+    </form>
+    <p id="loginStatus" class="login-status hidden"></p>
+  </div>
+</div>
+
+<div id="appShell" class="hidden">
+
 <header class="app-header">
   <h1>Wedding Guest Manager</h1>
   <div class="header-actions">
@@ -24,6 +40,7 @@
     </div>
 
     <button id="addGuestBtn" class="btn btn-primary">+ Add Guest</button>
+    <button id="signOutBtn" class="btn btn-secondary" title="Sign out">Sign Out</button>
   </div>
 </header>
 
@@ -57,7 +74,7 @@
     <select id="addressFilter">
       <option value="">All Addresses / Cities</option>
     </select>
-    <button id="addRelationBtn" class="btn btn-secondary">+ Relation</button>
+    <button id="addRelationBtn" class="btn btn-secondary hidden">+ Relation</button>
   </section>
 
   <section class="table-wrap">
@@ -82,6 +99,8 @@
     <p class="table-hint">Tick a checkbox to mark it done right from the list. Open Edit / Delete to change details or remove a guest.</p>
   </section>
 </main>
+
+</div>
 
 <div id="guestModal" class="modal-overlay hidden">
   <div class="modal">

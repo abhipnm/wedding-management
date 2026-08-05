@@ -42,10 +42,11 @@ const HEADER_ALIASES = {
 let guests = [];
 let relations = [];
 let db = null;
+let isAdmin = false;
 
 function initSupabase() {
   if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY || window.SUPABASE_URL.includes("xxxx")) {
-    showStatus("error", "Not connected to the database: config.js is missing or still has placeholder values. Copy config.example.js to config.js and fill in your Supabase URL + anon key.");
+    setLoginStatus("error", "Not connected to the database: config.js is missing or still has placeholder values. Copy config.example.js to config.js and fill in your Supabase URL + anon key.");
     return null;
   }
   return window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
@@ -723,12 +724,72 @@ document.getElementById("relationList").addEventListener("click", async (e) => {
   renderRelationFilter();
 });
 
-// ---------- Init ----------
+// ---------- Auth ----------
 
-(async function init() {
-  db = initSupabase();
-  if (!db) return;
+function setLoginStatus(type, message) {
+  const el = document.getElementById("loginStatus");
+  el.textContent = message;
+  el.className = `login-status ${type}`;
+}
+
+function showLoginScreen() {
+  document.getElementById("appShell").classList.add("hidden");
+  document.getElementById("loginScreen").classList.remove("hidden");
+}
+
+async function showApp() {
+  document.getElementById("loginScreen").classList.add("hidden");
+  document.getElementById("appShell").classList.remove("hidden");
   showStatus("info", "Loading guests…");
+
+  const { data: adminCheck } = await db.rpc("is_admin");
+  isAdmin = !!adminCheck;
+  document.getElementById("addRelationBtn").classList.toggle("hidden", !isAdmin);
+
   await Promise.all([loadGuests(), loadRelations()]);
   renderAll();
-})();
+
+  if (relations.length === 0 && guests.length === 0) {
+    showStatus("info", "You're signed in but don't have access to any guest categories yet — ask the admin to grant you access.");
+  }
+}
+
+document.getElementById("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("loginEmail").value.trim();
+  if (!email) return;
+
+  document.getElementById("loginStatus").classList.remove("hidden");
+  setLoginStatus("", "Sending…");
+
+  const { error } = await db.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.origin + window.location.pathname },
+  });
+
+  if (error) {
+    setLoginStatus("error", error.message);
+  } else {
+    setLoginStatus("success", `Check ${email} for a sign-in link.`);
+  }
+});
+
+document.getElementById("signOutBtn").addEventListener("click", async () => {
+  await db.auth.signOut();
+});
+
+// ---------- Init ----------
+
+db = initSupabase();
+if (db) {
+  db.auth.onAuthStateChange((_event, session) => {
+    if (session) {
+      showApp();
+    } else {
+      guests = [];
+      relations = [];
+      isAdmin = false;
+      showLoginScreen();
+    }
+  });
+}
