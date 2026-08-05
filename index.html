@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Wedding Guest Manager</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="app-header">
+  <h1>Wedding Guest Manager</h1>
+  <div class="header-actions">
+    <input type="file" id="importInput" accept=".xlsx,.xls" hidden />
+    <button id="importBtn" class="btn btn-secondary">Import Excel</button>
+
+    <div class="dropdown">
+      <button id="exportBtn" class="btn btn-secondary">Export ▾</button>
+      <div id="exportMenu" class="dropdown-menu hidden">
+        <button data-export="master">Export Master Sheet</button>
+        <button data-export="workbook">Export Category-wise Workbook</button>
+        <button data-export="single">Export Single Category…</button>
+      </div>
+    </div>
+
+    <button id="addGuestBtn" class="btn btn-primary">+ Add Guest</button>
+  </div>
+</header>
+
+<main>
+  <div id="statusBanner" class="status-banner hidden"></div>
+
+  <section class="dashboard">
+    <div class="stat-card">
+      <div class="stat-value" id="statTotal">0</div>
+      <div class="stat-label">Total Guests</div>
+    </div>
+    <div class="stat-card accepted">
+      <div class="stat-value" id="statAccepted">0</div>
+      <div class="stat-label">Accepted</div>
+    </div>
+    <div class="stat-card pending">
+      <div class="stat-value" id="statPending">0</div>
+      <div class="stat-label">Pending</div>
+    </div>
+    <div class="stat-card declined">
+      <div class="stat-value" id="statDeclined">0</div>
+      <div class="stat-label">Declined</div>
+    </div>
+  </section>
+
+  <section class="filters">
+    <input type="text" id="searchInput" placeholder="Search guests by name, address, notes…" />
+    <select id="relationFilter">
+      <option value="">All Relations</option>
+    </select>
+    <select id="addressFilter">
+      <option value="">All Addresses / Cities</option>
+    </select>
+  </section>
+
+  <section class="table-wrap">
+    <table id="guestTable">
+      <thead>
+        <tr>
+          <th>Guest Name</th>
+          <th>Address / City</th>
+          <th>Relation</th>
+          <th>RSVP Status</th>
+          <th>Guest Count</th>
+          <th>Card Sent</th>
+          <th>Invited for Barat</th>
+          <th>Invited for Reception</th>
+          <th>Notes</th>
+          <th></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="guestTableBody"></tbody>
+    </table>
+    <p id="emptyState" class="empty-state hidden">No guests yet. Add a guest or import an Excel file to get started.</p>
+    <p class="table-hint">Tick a checkbox to mark it done right from the list — no need to open Edit.</p>
+  </section>
+</main>
+
+<div id="guestModal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2 id="modalTitle">Add Guest</h2>
+    <form id="guestForm">
+      <input type="hidden" id="guestId" />
+
+      <label>Guest Name
+        <input type="text" id="fieldName" />
+      </label>
+
+      <label>Address / City
+        <input type="text" id="fieldAddress" />
+      </label>
+
+      <label>Relation
+        <input type="text" id="fieldRelation" list="relationOptions" placeholder="e.g. Family, Friends, Neighbors" />
+        <datalist id="relationOptions"></datalist>
+      </label>
+
+      <label>RSVP Status
+        <select id="fieldRsvp">
+          <option value="Pending">Pending</option>
+          <option value="Accepted">Accepted</option>
+          <option value="Declined">Declined</option>
+        </select>
+      </label>
+
+      <label>Guest Count
+        <input type="number" id="fieldGuestCount" min="0" step="1" />
+      </label>
+
+      <label>Card Sent
+        <select id="fieldCardSent">
+          <option value="No">No</option>
+          <option value="Yes">Yes</option>
+        </select>
+      </label>
+
+      <label>Invited for Barat
+        <select id="fieldBarat">
+          <option value="No">No</option>
+          <option value="Yes">Yes</option>
+        </select>
+      </label>
+
+      <label>Invited for Reception
+        <select id="fieldReception">
+          <option value="No">No</option>
+          <option value="Yes">Yes</option>
+        </select>
+      </label>
+
+      <label class="full-width">Notes
+        <textarea id="fieldNotes" rows="2"></textarea>
+      </label>
+
+      <div class="modal-actions">
+        <button type="button" id="cancelModalBtn" class="btn btn-secondary">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Guest</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="categoryModal" class="modal-overlay hidden">
+  <div class="modal modal-small">
+    <h2>Export Single Category</h2>
+    <label>Relation
+      <select id="categoryExportSelect"></select>
+    </label>
+    <div class="modal-actions">
+      <button type="button" id="cancelCategoryBtn" class="btn btn-secondary">Cancel</button>
+      <button type="button" id="confirmCategoryBtn" class="btn btn-primary">Export</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
