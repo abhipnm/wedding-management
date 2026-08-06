@@ -145,6 +145,13 @@ body {
   word-break: break-all;
 }
 
+.copy-link-btn {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px !important;
+  padding: 6px 10px !important;
+}
+
 .continue-btn {
   width: 100%;
   margin-top: 12px;
@@ -232,6 +239,27 @@ body {
   color: var(--text);
 }
 .dropdown-menu button:hover { background: var(--bg); }
+
+.share-access-panel {
+  padding: 14px;
+  min-width: 300px;
+  overflow: visible;
+}
+.share-access-panel .btn {
+  display: inline-block;
+  width: auto;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.share-access-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.share-access-title span {
+  font-weight: 600;
+  color: var(--text);
+}
 
 main {
   max-width: 1200px;

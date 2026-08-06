@@ -42,8 +42,8 @@ const HEADER_ALIASES = {
 let guests = [];
 let relations = [];
 let db = null;
-let isAdmin = false;
-let allowedRelations = [];
+let groupId = null;
+let groupLabel = null;
 
 function initSupabase() {
   if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY || window.SUPABASE_URL.includes("xxxx")) {
@@ -81,36 +81,33 @@ function rowFromDb(row) {
 }
 
 function rowToDb(guest) {
-  const out = {};
+  const out = { group_id: groupId };
   FIELDS.forEach((f) => { out[DB_COLUMN[f.key]] = guest[f.key] ?? ""; });
   return out;
 }
 
-// This link's token grants everything (isAdmin) or just a specific list of
-// relations — filtered here, client-side, on every load. The database
-// itself doesn't enforce this (guests/relations are anon-open), matching
-// the "share a link, no accounts" trade-off used elsewhere in this app.
-function visibleToThisLink(relationName) {
-  return isAdmin || allowedRelations.includes((relationName || "").trim());
-}
-
+// Every query is scoped to this session's group (one wedding = one group).
+// guests/relations are anon-open at the database level (no accounts), so
+// this isolation is enforced by the app always filtering/writing with
+// group_id — not by a hard database wall. Someone hitting the API
+// directly with a different group_id could still read across groups.
 async function loadGuests() {
-  const { data, error } = await db.from("guests").select("*").order("created_at", { ascending: true });
+  const { data, error } = await db.from("guests").select("*").eq("group_id", groupId).order("created_at", { ascending: true });
   if (error) {
     showStatus("error", `Couldn't load guests: ${error.message}`);
     return;
   }
-  guests = data.map(rowFromDb).filter((g) => visibleToThisLink(g.relation));
+  guests = data.map(rowFromDb);
   clearStatus();
 }
 
 async function loadRelations() {
-  const { data, error } = await db.from("relations").select("*").order("name", { ascending: true });
+  const { data, error } = await db.from("relations").select("*").eq("group_id", groupId).order("name", { ascending: true });
   if (error) {
     showStatus("error", `Couldn't load relations: ${error.message}`);
     return;
   }
-  relations = data.filter((r) => visibleToThisLink(r.name));
+  relations = data;
 }
 
 // Union of the managed relations list and whatever's actually on guests
@@ -465,8 +462,8 @@ async function importFromWorkbook(workbook) {
   ));
   if (newRelationNames.length > 0) {
     await db.from("relations").upsert(
-      newRelationNames.map((name) => ({ name })),
-      { onConflict: "name", ignoreDuplicates: true }
+      newRelationNames.map((name) => ({ name, group_id: groupId })),
+      { onConflict: "group_id,name", ignoreDuplicates: true }
     );
     await loadRelations();
   }
@@ -704,7 +701,7 @@ relationForm.addEventListener("submit", async (e) => {
   const name = input.value.trim();
   if (!name) return;
 
-  const { data: inserted, error } = await db.from("relations").insert({ name }).select().single();
+  const { data: inserted, error } = await db.from("relations").insert({ name, group_id: groupId }).select().single();
   if (error) {
     showStatus("error", error.code === "23505" ? `"${name}" already exists.` : `Couldn't add relation: ${error.message}`);
     return;
@@ -736,11 +733,13 @@ document.getElementById("relationList").addEventListener("click", async (e) => {
 });
 
 // ---------- Access link ----------
-// No accounts: whoever has the URL's ?t=<token> gets in. The token is
-// resolved server-side (resolve_access_link) to find what it's scoped to,
-// but the actual guests/relations tables are open to anyone with the app
-// open — this app deliberately trades strict security for a plain
-// shareable link, same as other tools in this account.
+// No accounts: a Group ID is a whole isolated workspace (one wedding).
+// Whoever has the code/link gets full read-write access to that group's
+// guests and categories — but nothing from any other group. The database
+// itself doesn't wall this off (guests/relations are anon-open); the app
+// enforces it by always filtering/writing with the current group_id.
+
+let currentToken = null;
 
 function setLoginStatus(message, isError) {
   const el = document.getElementById("loginStatus");
@@ -763,18 +762,31 @@ function tokenUrl(token) {
   return `${window.location.origin}${window.location.pathname}?t=${token}`;
 }
 
+async function copyToClipboard(text, btn) {
+  try {
+    await navigator.clipboard.writeText(text);
+    const original = btn.textContent;
+    btn.textContent = "Copied!";
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  } catch {
+    // Clipboard API unavailable (e.g. non-HTTPS) — the value is already
+    // visible on screen for manual copying.
+  }
+}
+
 async function showApp() {
   document.getElementById("loginScreen").classList.add("hidden");
   document.getElementById("appShell").classList.remove("hidden");
-  document.getElementById("addRelationBtn").classList.toggle("hidden", !isAdmin);
+  document.getElementById("addRelationBtn").classList.remove("hidden");
+  document.getElementById("shareAccessBtn").classList.remove("hidden");
+  document.getElementById("shareGroupLabel").textContent = groupLabel ? `"${groupLabel}"` : "your group";
+  document.getElementById("shareCode").textContent = currentToken;
+  document.getElementById("shareLink").textContent = tokenUrl(currentToken);
   showStatus("info", "Loading guests…");
 
   await Promise.all([loadGuests(), loadRelations()]);
   renderAll();
-
-  if (!isAdmin && relations.length === 0 && guests.length === 0) {
-    showStatus("info", "This link doesn't have access to any guest categories yet — ask whoever shared it with you for a link scoped to the right one.");
-  }
+  clearStatus();
 }
 
 // Resolves a token and, if valid, switches straight into the app. Returns
@@ -784,8 +796,9 @@ async function tryToken(token) {
   const result = data && data[0];
   if (error || !result || !result.valid) return false;
 
-  isAdmin = result.is_admin;
-  allowedRelations = result.relations || [];
+  currentToken = token;
+  groupId = result.group_id;
+  groupLabel = result.label;
   window.history.replaceState(null, "", `${window.location.pathname}?t=${token}`);
   await showApp();
   return true;
@@ -795,7 +808,7 @@ async function initFromLink() {
   const token = new URLSearchParams(window.location.search).get("t");
   if (token) {
     if (await tryToken(token)) return;
-    showLandingScreen("That link isn't valid. Ask the admin for a new one, or join/create a group below.", true);
+    showLandingScreen("That link isn't valid. Ask whoever shared it with you for a new one, or join/create a group below.", true);
     return;
   }
   showLandingScreen();
@@ -819,7 +832,7 @@ document.getElementById("createGroupForm").addEventListener("submit", async (e) 
   const label = input.value.trim();
 
   setLoginStatus("Generating…");
-  const { data, error } = await db.rpc("generate_access_code", { p_label: label || null });
+  const { data, error } = await db.rpc("create_group", { p_label: label || null });
   const result = data && data[0];
 
   if (error || !result) {
@@ -831,24 +844,41 @@ document.getElementById("createGroupForm").addEventListener("submit", async (e) 
   document.getElementById("createGroupResult").classList.remove("hidden");
   document.getElementById("createGroupResult").dataset.token = result.token;
   document.querySelector("#createGroupResult p").textContent =
-    "Group ID created! Share this code with whoever needs access:";
+    "Group ID created! Share this with whoever needs access to this wedding's guest list:";
   document.getElementById("createGroupToken").textContent = result.token;
   document.getElementById("createGroupLink").textContent = tokenUrl(result.token);
   input.value = "";
 });
 
-document.getElementById("copySharedIdBtn").addEventListener("click", async () => {
+document.getElementById("copySharedIdBtn").addEventListener("click", (e) => {
   const token = document.getElementById("createGroupResult").dataset.token;
-  try {
-    await navigator.clipboard.writeText(token);
-    const btn = document.getElementById("copySharedIdBtn");
-    const original = btn.textContent;
-    btn.textContent = "Copied!";
-    setTimeout(() => { btn.textContent = original; }, 1500);
-  } catch {
-    // Clipboard API unavailable (e.g. non-HTTPS) — the code is already
-    // visible for manual copying.
+  copyToClipboard(token, e.currentTarget);
+});
+
+document.getElementById("copySharedLinkBtn").addEventListener("click", (e) => {
+  const token = document.getElementById("createGroupResult").dataset.token;
+  copyToClipboard(tokenUrl(token), e.currentTarget);
+});
+
+// ---------- Share access (persistent, available anywhere in the app) ----------
+
+const shareAccessPanel = document.getElementById("shareAccessPanel");
+
+document.getElementById("shareAccessBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  shareAccessPanel.classList.toggle("hidden");
+});
+document.addEventListener("click", (e) => {
+  if (!shareAccessPanel.contains(e.target) && e.target.id !== "shareAccessBtn") {
+    shareAccessPanel.classList.add("hidden");
   }
+});
+
+document.getElementById("copyShareCodeBtn").addEventListener("click", (e) => {
+  copyToClipboard(currentToken, e.currentTarget);
+});
+document.getElementById("copyShareLinkBtn").addEventListener("click", (e) => {
+  copyToClipboard(tokenUrl(currentToken), e.currentTarget);
 });
 
 document.getElementById("continueToGroupBtn").addEventListener("click", () => {

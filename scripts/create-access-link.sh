@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Generates a new 6-digit Group ID that grants full access to the app, and
-# prints it plus the shareable link. Same thing the "Generate a new Group
-# ID" button on the landing page does — this is just the terminal version,
-# handy for generating a batch of codes at once.
+# Creates a new, fully isolated group (one wedding's workspace) and prints
+# its 6-digit Group ID plus the shareable link. Same thing the "Generate a
+# new Group ID" button on the landing page does — this is the terminal
+# version, handy for generating several at once.
 #
 # Usage:
-#   ./scripts/create-access-link.sh ["Label, e.g. Bride's mom"] [base-url]
+#   ./scripts/create-access-link.sh ["Label, e.g. Abhishek's Marriage"] [base-url]
 
 set -euo pipefail
 
@@ -14,7 +14,7 @@ BASE_URL="${2:-http://localhost:8000}"
 
 cd "$(dirname "$0")/.."
 
-RESULT=$(supabase db query --linked "select token from public.generate_access_code($( [ -n "$LABEL" ] && echo "'${LABEL}'" || echo "null" ));" -o json 2>&1)
+RESULT=$(supabase db query --linked "select token from public.create_group($( [ -n "$LABEL" ] && echo "'${LABEL}'" || echo "null" ));" -o json 2>&1)
 
 TOKEN=$(echo "$RESULT" | python3 -c "
 import json, sys
@@ -24,7 +24,7 @@ try:
     print(d['rows'][0]['token'])
 except Exception:
     sys.exit(1)
-" 2>/dev/null) || { echo "Couldn't generate a code:" >&2; echo "$RESULT" >&2; exit 1; }
+" 2>/dev/null) || { echo "Couldn't create a group:" >&2; echo "$RESULT" >&2; exit 1; }
 
 echo "Group ID: ${TOKEN}"
 echo "Link: ${BASE_URL}/?t=${TOKEN}"

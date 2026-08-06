@@ -27,9 +27,9 @@
 
       <section class="landing-section">
         <h2>Generate a new Group ID</h2>
-        <p class="landing-hint">No code yet? Generate one instantly and share it with whoever needs access.</p>
+        <p class="landing-hint">Starting a new wedding's guest list? Generate its Group ID here.</p>
         <form id="createGroupForm">
-          <input type="text" id="createGroupName" placeholder="Label, e.g. Bride's mom (optional)" autocomplete="off" />
+          <input type="text" id="createGroupName" placeholder="Label: e.g. Abhishek's Marriage" autocomplete="off" />
           <button type="submit" class="btn btn-secondary">Generate</button>
         </form>
       </section>
@@ -40,7 +40,9 @@
           <code id="createGroupToken" class="shared-code"></code>
           <button type="button" id="copySharedIdBtn" class="btn btn-secondary">Copy Code</button>
         </div>
-        <p class="shared-link-hint">Or send the full link: <span id="createGroupLink"></span></p>
+        <p class="shared-link-hint">Or send the full link: <span id="createGroupLink"></span>
+          <button type="button" id="copySharedLinkBtn" class="btn btn-secondary copy-link-btn">Copy Link</button>
+        </p>
         <button type="button" id="continueToGroupBtn" class="btn btn-primary continue-btn">Continue</button>
       </div>
     </div>
@@ -65,6 +67,20 @@
     </div>
 
     <button id="addGuestBtn" class="btn btn-primary">+ Add Guest</button>
+
+    <div class="dropdown">
+      <button id="shareAccessBtn" class="btn btn-secondary hidden">Share Access</button>
+      <div id="shareAccessPanel" class="dropdown-menu share-access-panel hidden">
+        <p class="share-access-title">Access to <span id="shareGroupLabel"></span></p>
+        <div class="shared-id-row">
+          <code id="shareCode" class="shared-code"></code>
+          <button type="button" id="copyShareCodeBtn" class="btn btn-secondary">Copy Code</button>
+        </div>
+        <p class="shared-link-hint">Or send the full link: <span id="shareLink"></span>
+          <button type="button" id="copyShareLinkBtn" class="btn btn-secondary copy-link-btn">Copy Link</button>
+        </p>
+      </div>
+    </div>
   </div>
 </header>
 
