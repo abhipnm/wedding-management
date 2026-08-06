@@ -9,6 +9,7 @@
   --accepted: #2e7d5b;
   --pending: #b8860b;
   --declined: #b5495b;
+  --invitations: #2d5187;
   --radius: 10px;
 }
 
@@ -269,7 +270,7 @@ main {
 
 .dashboard {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 }
@@ -291,6 +292,7 @@ main {
 .stat-card.accepted .stat-value { color: var(--accepted); }
 .stat-card.pending .stat-value { color: var(--pending); }
 .stat-card.declined .stat-value { color: var(--declined); }
+.stat-card.invitations .stat-value { color: var(--invitations); }
 
 .stat-label {
   font-size: 13px;

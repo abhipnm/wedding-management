@@ -142,7 +142,7 @@ function getFilteredGuests() {
 }
 
 function renderDashboard() {
-  let total = 0, accepted = 0, pending = 0, declined = 0;
+  let total = 0, accepted = 0, pending = 0, declined = 0, invitationsSent = 0;
   guests.forEach((g) => {
     const c = toCount(g);
     total += c;
@@ -150,11 +150,13 @@ function renderDashboard() {
     if (status === "accepted") accepted += c;
     else if (status === "declined") declined += c;
     else pending += c;
+    if ((g.cardSent || "").toLowerCase() === "yes") invitationsSent += 1;
   });
   document.getElementById("statTotal").textContent = total;
   document.getElementById("statAccepted").textContent = accepted;
   document.getElementById("statPending").textContent = pending;
   document.getElementById("statDeclined").textContent = declined;
+  document.getElementById("statInvitations").textContent = invitationsSent;
 }
 
 function getDistinctRelations() {
@@ -383,7 +385,9 @@ document.getElementById("guestTableBody").addEventListener("change", async (e) =
     checkbox.checked = previousValue === "Yes";
     checkbox.title = previousValue;
     showStatus("error", `Couldn't save that checkbox: ${error.message}`);
+    return;
   }
+  if (field === "cardSent") renderDashboard();
 });
 
 // ---------- Search / filter ----------
