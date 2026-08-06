@@ -399,7 +399,32 @@ document.getElementById("addressFilter").addEventListener("change", renderTable)
 // ---------- Import ----------
 
 const importInput = document.getElementById("importInput");
-document.getElementById("importBtn").addEventListener("click", () => importInput.click());
+const importBtn = document.getElementById("importBtn");
+const importMenu = document.getElementById("importMenu");
+let importMode = "add"; // "add" | "replace"
+
+importBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  importMenu.classList.toggle("hidden");
+});
+document.addEventListener("click", () => importMenu.classList.add("hidden"));
+
+importMenu.addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-import]");
+  if (!btn) return;
+  importMenu.classList.add("hidden");
+  const action = btn.dataset.import;
+
+  if (action === "template") {
+    downloadTemplate();
+  } else if (action === "add") {
+    importMode = "add";
+    importInput.click();
+  } else if (action === "replace") {
+    importMode = "replace";
+    importInput.click();
+  }
+});
 
 importInput.addEventListener("change", (e) => {
   const file = e.target.files[0];
@@ -408,13 +433,19 @@ importInput.addEventListener("change", (e) => {
   reader.onload = (evt) => {
     const data = new Uint8Array(evt.target.result);
     const workbook = XLSX.read(data, { type: "array" });
-    importFromWorkbook(workbook);
+    importFromWorkbook(workbook, importMode);
     importInput.value = "";
   };
   reader.readAsArrayBuffer(file);
 });
 
-async function importFromWorkbook(workbook) {
+async function downloadTemplate() {
+  const wb = newWorkbook();
+  addStyledSheet(wb, "Guests", []);
+  await downloadWorkbook(wb, "wedding-guest-template.xlsx");
+}
+
+async function importFromWorkbook(workbook, mode) {
   const masterSheetName = workbook.SheetNames.find((n) => normalizeHeader(n).startsWith("master"));
   const sheetName = masterSheetName || workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
@@ -452,6 +483,23 @@ async function importFromWorkbook(workbook) {
     return;
   }
 
+  if (mode === "replace") {
+    const existingCount = guests.length;
+    const ok = confirm(
+      `This will delete all ${existingCount} existing guest${existingCount === 1 ? "" : "s"} in this group and replace ` +
+      `${existingCount === 1 ? "it" : "them"} with the ${newGuests.length} guest${newGuests.length === 1 ? "" : "s"} found in "${sheetName}". ` +
+      `This can't be undone. Continue?`
+    );
+    if (!ok) return;
+
+    const { error: deleteError } = await db.from("guests").delete().eq("group_id", groupId);
+    if (deleteError) {
+      showStatus("error", `Couldn't clear the existing guest list: ${deleteError.message}`);
+      return;
+    }
+    guests = [];
+  }
+
   const { data: inserted, error } = await db.from("guests").insert(newGuests.map(rowToDb)).select();
   if (error) {
     showStatus("error", `Import failed: ${error.message}`);
@@ -473,7 +521,8 @@ async function importFromWorkbook(workbook) {
   }
 
   renderAll();
-  alert(`Imported ${inserted.length} guest${inserted.length === 1 ? "" : "s"} from "${sheetName}".`);
+  const verb = mode === "replace" ? "Replaced guest list with" : "Imported";
+  alert(`${verb} ${inserted.length} guest${inserted.length === 1 ? "" : "s"} from "${sheetName}".`);
 }
 
 // ---------- Export (styled .xlsx via ExcelJS) ----------

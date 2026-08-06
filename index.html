@@ -55,7 +55,14 @@
   <h1>Wedding Guest Manager</h1>
   <div class="header-actions">
     <input type="file" id="importInput" accept=".xlsx,.xls" hidden />
-    <button id="importBtn" class="btn btn-secondary">Import Excel</button>
+    <div class="dropdown">
+      <button id="importBtn" class="btn btn-secondary">Import ▾</button>
+      <div id="importMenu" class="dropdown-menu hidden">
+        <button data-import="template">Download Blank Template</button>
+        <button data-import="add">Add to Guest List</button>
+        <button data-import="replace">Replace Entire Guest List…</button>
+      </div>
+    </div>
 
     <div class="dropdown">
       <button id="exportBtn" class="btn btn-secondary">Export ▾</button>
