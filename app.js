@@ -43,10 +43,13 @@ let guests = [];
 let relations = [];
 let db = null;
 let isAdmin = false;
+let allowedRelations = [];
 
 function initSupabase() {
   if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY || window.SUPABASE_URL.includes("xxxx")) {
-    setLoginStatus("error", "Not connected to the database: config.js is missing or still has placeholder values. Copy config.example.js to config.js and fill in your Supabase URL + anon key.");
+    document.getElementById("loginStatus").textContent =
+      "Not connected to the database: config.js is missing or still has placeholder values. Copy config.example.js to config.js and fill in your Supabase URL + anon key.";
+    document.getElementById("loginStatus").className = "login-status error";
     return null;
   }
   return window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
@@ -83,13 +86,21 @@ function rowToDb(guest) {
   return out;
 }
 
+// This link's token grants everything (isAdmin) or just a specific list of
+// relations — filtered here, client-side, on every load. The database
+// itself doesn't enforce this (guests/relations are anon-open), matching
+// the "share a link, no accounts" trade-off used elsewhere in this app.
+function visibleToThisLink(relationName) {
+  return isAdmin || allowedRelations.includes((relationName || "").trim());
+}
+
 async function loadGuests() {
   const { data, error } = await db.from("guests").select("*").order("created_at", { ascending: true });
   if (error) {
     showStatus("error", `Couldn't load guests: ${error.message}`);
     return;
   }
-  guests = data.map(rowFromDb);
+  guests = data.map(rowFromDb).filter((g) => visibleToThisLink(g.relation));
   clearStatus();
 }
 
@@ -99,7 +110,7 @@ async function loadRelations() {
     showStatus("error", `Couldn't load relations: ${error.message}`);
     return;
   }
-  relations = data;
+  relations = data.filter((r) => visibleToThisLink(r.name));
 }
 
 // Union of the managed relations list and whatever's actually on guests
@@ -724,72 +735,60 @@ document.getElementById("relationList").addEventListener("click", async (e) => {
   renderRelationFilter();
 });
 
-// ---------- Auth ----------
+// ---------- Access link ----------
+// No accounts: whoever has the URL's ?t=<token> gets in. The token is
+// resolved server-side (resolve_access_link) to find what it's scoped to,
+// but the actual guests/relations tables are open to anyone with the app
+// open — this app deliberately trades strict security for a plain
+// shareable link, same as other tools in this account.
 
-function setLoginStatus(type, message) {
+function setLoginStatus(message, isError) {
   const el = document.getElementById("loginStatus");
   el.textContent = message;
-  el.className = `login-status ${type}`;
+  el.className = isError ? "login-status error" : "login-status";
 }
 
-function showLoginScreen() {
+function showLoginScreen(message, isError) {
   document.getElementById("appShell").classList.add("hidden");
   document.getElementById("loginScreen").classList.remove("hidden");
+  if (message) setLoginStatus(message, isError);
 }
 
 async function showApp() {
   document.getElementById("loginScreen").classList.add("hidden");
   document.getElementById("appShell").classList.remove("hidden");
-  showStatus("info", "Loading guests…");
-
-  const { data: adminCheck } = await db.rpc("is_admin");
-  isAdmin = !!adminCheck;
   document.getElementById("addRelationBtn").classList.toggle("hidden", !isAdmin);
+  showStatus("info", "Loading guests…");
 
   await Promise.all([loadGuests(), loadRelations()]);
   renderAll();
 
-  if (relations.length === 0 && guests.length === 0) {
-    showStatus("info", "You're signed in but don't have access to any guest categories yet — ask the admin to grant you access.");
+  if (!isAdmin && relations.length === 0 && guests.length === 0) {
+    showStatus("info", "This link doesn't have access to any guest categories yet — ask whoever shared it with you for a link scoped to the right one.");
   }
 }
 
-document.getElementById("loginForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const email = document.getElementById("loginEmail").value.trim();
-  if (!email) return;
-
-  document.getElementById("loginStatus").classList.remove("hidden");
-  setLoginStatus("", "Sending…");
-
-  const { error } = await db.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: window.location.origin + window.location.pathname },
-  });
-
-  if (error) {
-    setLoginStatus("error", error.message);
-  } else {
-    setLoginStatus("success", `Check ${email} for a sign-in link.`);
+async function initFromLink() {
+  const token = new URLSearchParams(window.location.search).get("t");
+  if (!token) {
+    showLoginScreen("This page needs a link with an access token (?t=...). Ask the admin for your link.", true);
+    return;
   }
-});
 
-document.getElementById("signOutBtn").addEventListener("click", async () => {
-  await db.auth.signOut();
-});
+  const { data, error } = await db.rpc("resolve_access_link", { p_token: token });
+  const result = data && data[0];
+
+  if (error || !result || !result.valid) {
+    showLoginScreen("This link isn't valid. Ask the admin for a new one.", true);
+    return;
+  }
+
+  isAdmin = result.is_admin;
+  allowedRelations = result.relations || [];
+  await showApp();
+}
 
 // ---------- Init ----------
 
 db = initSupabase();
-if (db) {
-  db.auth.onAuthStateChange((_event, session) => {
-    if (session) {
-      showApp();
-    } else {
-      guests = [];
-      relations = [];
-      isAdmin = false;
-      showLoginScreen();
-    }
-  });
-}
+if (db) initFromLink();
