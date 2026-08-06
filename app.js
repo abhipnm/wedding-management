@@ -809,22 +809,21 @@ document.getElementById("joinGroupForm").addEventListener("submit", async (e) =>
 
   setLoginStatus("Joining…");
   if (!(await tryToken(id))) {
-    setLoginStatus("That Shared ID isn't valid — double-check it and try again.", true);
+    setLoginStatus("That Group ID isn't valid — double-check it and try again.", true);
   }
 });
 
 document.getElementById("createGroupForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const input = document.getElementById("createGroupName");
-  const name = input.value.trim();
-  if (!name) return;
+  const label = input.value.trim();
 
-  setLoginStatus("Creating…");
-  const { data, error } = await db.rpc("create_group", { p_name: name });
+  setLoginStatus("Generating…");
+  const { data, error } = await db.rpc("generate_access_code", { p_label: label || null });
   const result = data && data[0];
 
   if (error || !result) {
-    setLoginStatus(error?.message || "Couldn't create that group.", true);
+    setLoginStatus(error?.message || "Couldn't generate a code.", true);
     return;
   }
 
@@ -832,22 +831,23 @@ document.getElementById("createGroupForm").addEventListener("submit", async (e) 
   document.getElementById("createGroupResult").classList.remove("hidden");
   document.getElementById("createGroupResult").dataset.token = result.token;
   document.querySelector("#createGroupResult p").textContent =
-    `Group "${result.relation}" created! Share this link with others who should see it:`;
-  document.getElementById("createGroupToken").textContent = tokenUrl(result.token);
+    "Group ID created! Share this code with whoever needs access:";
+  document.getElementById("createGroupToken").textContent = result.token;
+  document.getElementById("createGroupLink").textContent = tokenUrl(result.token);
   input.value = "";
 });
 
 document.getElementById("copySharedIdBtn").addEventListener("click", async () => {
   const token = document.getElementById("createGroupResult").dataset.token;
   try {
-    await navigator.clipboard.writeText(tokenUrl(token));
+    await navigator.clipboard.writeText(token);
     const btn = document.getElementById("copySharedIdBtn");
     const original = btn.textContent;
     btn.textContent = "Copied!";
     setTimeout(() => { btn.textContent = original; }, 1500);
   } catch {
-    // Clipboard API unavailable (e.g. non-HTTPS) — the link is already
-    // visible in the code box for manual copying.
+    // Clipboard API unavailable (e.g. non-HTTPS) — the code is already
+    // visible for manual copying.
   }
 });
 

@@ -15,10 +15,10 @@
 
     <div id="landingOptions" class="hidden">
       <section class="landing-section">
-        <h2>Join a group</h2>
-        <p class="landing-hint">Have a Shared ID from someone? Enter it here.</p>
+        <h2>Enter your Group ID</h2>
+        <p class="landing-hint">Got a 6-digit code from someone? Enter it here.</p>
         <form id="joinGroupForm">
-          <input type="text" id="joinGroupId" placeholder="Shared ID" autocomplete="off" />
+          <input type="text" id="joinGroupId" placeholder="e.g. 482913" autocomplete="off" inputmode="numeric" />
           <button type="submit" class="btn btn-primary">Join</button>
         </form>
       </section>
@@ -26,21 +26,22 @@
       <div class="landing-divider">or</div>
 
       <section class="landing-section">
-        <h2>Create a new group</h2>
-        <p class="landing-hint">Starts a new guest category (e.g. "Family") and gives you a Shared ID to hand out.</p>
+        <h2>Generate a new Group ID</h2>
+        <p class="landing-hint">No code yet? Generate one instantly and share it with whoever needs access.</p>
         <form id="createGroupForm">
-          <input type="text" id="createGroupName" placeholder="Group name, e.g. Family" autocomplete="off" />
-          <button type="submit" class="btn btn-secondary">Create</button>
+          <input type="text" id="createGroupName" placeholder="Label, e.g. Bride's mom (optional)" autocomplete="off" />
+          <button type="submit" class="btn btn-secondary">Generate</button>
         </form>
       </section>
 
       <div id="createGroupResult" class="create-group-result hidden">
         <p></p>
         <div class="shared-id-row">
-          <code id="createGroupToken"></code>
-          <button type="button" id="copySharedIdBtn" class="btn btn-secondary">Copy Link</button>
+          <code id="createGroupToken" class="shared-code"></code>
+          <button type="button" id="copySharedIdBtn" class="btn btn-secondary">Copy Code</button>
         </div>
-        <button type="button" id="continueToGroupBtn" class="btn btn-primary continue-btn">Continue to your group</button>
+        <p class="shared-link-hint">Or send the full link: <span id="createGroupLink"></span></p>
+        <button type="button" id="continueToGroupBtn" class="btn btn-primary continue-btn">Continue</button>
       </div>
     </div>
   </div>

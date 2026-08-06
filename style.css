@@ -129,6 +129,22 @@ body {
   font-size: 12.5px;
 }
 
+.shared-id-row code.shared-code {
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--primary-dark);
+  padding: 10px;
+}
+
+.shared-link-hint {
+  margin: 10px 0 0 !important;
+  font-size: 11.5px !important;
+  color: var(--text-muted) !important;
+  word-break: break-all;
+}
+
 .continue-btn {
   width: 100%;
   margin-top: 12px;
