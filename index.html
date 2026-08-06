@@ -11,7 +11,38 @@
 <div id="loginScreen" class="login-screen">
   <div class="login-card">
     <h1>Wedding Guest Manager</h1>
-    <p id="loginStatus" class="login-status">Checking your link…</p>
+    <p id="loginStatus" class="login-status hidden"></p>
+
+    <div id="landingOptions" class="hidden">
+      <section class="landing-section">
+        <h2>Join a group</h2>
+        <p class="landing-hint">Have a Shared ID from someone? Enter it here.</p>
+        <form id="joinGroupForm">
+          <input type="text" id="joinGroupId" placeholder="Shared ID" autocomplete="off" />
+          <button type="submit" class="btn btn-primary">Join</button>
+        </form>
+      </section>
+
+      <div class="landing-divider">or</div>
+
+      <section class="landing-section">
+        <h2>Create a new group</h2>
+        <p class="landing-hint">Starts a new guest category (e.g. "Family") and gives you a Shared ID to hand out.</p>
+        <form id="createGroupForm">
+          <input type="text" id="createGroupName" placeholder="Group name, e.g. Family" autocomplete="off" />
+          <button type="submit" class="btn btn-secondary">Create</button>
+        </form>
+      </section>
+
+      <div id="createGroupResult" class="create-group-result hidden">
+        <p></p>
+        <div class="shared-id-row">
+          <code id="createGroupToken"></code>
+          <button type="button" id="copySharedIdBtn" class="btn btn-secondary">Copy Link</button>
+        </div>
+        <button type="button" id="continueToGroupBtn" class="btn btn-primary continue-btn">Continue to your group</button>
+      </div>
+    </div>
   </div>
 </div>
 

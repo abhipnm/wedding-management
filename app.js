@@ -744,14 +744,23 @@ document.getElementById("relationList").addEventListener("click", async (e) => {
 
 function setLoginStatus(message, isError) {
   const el = document.getElementById("loginStatus");
+  if (!message) {
+    el.classList.add("hidden");
+    return;
+  }
   el.textContent = message;
   el.className = isError ? "login-status error" : "login-status";
 }
 
-function showLoginScreen(message, isError) {
+function showLandingScreen(message, isError) {
   document.getElementById("appShell").classList.add("hidden");
   document.getElementById("loginScreen").classList.remove("hidden");
-  if (message) setLoginStatus(message, isError);
+  document.getElementById("landingOptions").classList.remove("hidden");
+  setLoginStatus(message, isError);
+}
+
+function tokenUrl(token) {
+  return `${window.location.origin}${window.location.pathname}?t=${token}`;
 }
 
 async function showApp() {
@@ -768,25 +777,84 @@ async function showApp() {
   }
 }
 
-async function initFromLink() {
-  const token = new URLSearchParams(window.location.search).get("t");
-  if (!token) {
-    showLoginScreen("This page needs a link with an access token (?t=...). Ask the admin for your link.", true);
-    return;
-  }
-
+// Resolves a token and, if valid, switches straight into the app. Returns
+// whether it worked, so callers can decide what to show on failure.
+async function tryToken(token) {
   const { data, error } = await db.rpc("resolve_access_link", { p_token: token });
   const result = data && data[0];
-
-  if (error || !result || !result.valid) {
-    showLoginScreen("This link isn't valid. Ask the admin for a new one.", true);
-    return;
-  }
+  if (error || !result || !result.valid) return false;
 
   isAdmin = result.is_admin;
   allowedRelations = result.relations || [];
+  window.history.replaceState(null, "", `${window.location.pathname}?t=${token}`);
   await showApp();
+  return true;
 }
+
+async function initFromLink() {
+  const token = new URLSearchParams(window.location.search).get("t");
+  if (token) {
+    if (await tryToken(token)) return;
+    showLandingScreen("That link isn't valid. Ask the admin for a new one, or join/create a group below.", true);
+    return;
+  }
+  showLandingScreen();
+}
+
+document.getElementById("joinGroupForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = document.getElementById("joinGroupId");
+  const id = input.value.trim();
+  if (!id) return;
+
+  setLoginStatus("Joining…");
+  if (!(await tryToken(id))) {
+    setLoginStatus("That Shared ID isn't valid — double-check it and try again.", true);
+  }
+});
+
+document.getElementById("createGroupForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = document.getElementById("createGroupName");
+  const name = input.value.trim();
+  if (!name) return;
+
+  setLoginStatus("Creating…");
+  const { data, error } = await db.rpc("create_group", { p_name: name });
+  const result = data && data[0];
+
+  if (error || !result) {
+    setLoginStatus(error?.message || "Couldn't create that group.", true);
+    return;
+  }
+
+  setLoginStatus("");
+  document.getElementById("createGroupResult").classList.remove("hidden");
+  document.getElementById("createGroupResult").dataset.token = result.token;
+  document.querySelector("#createGroupResult p").textContent =
+    `Group "${result.relation}" created! Share this link with others who should see it:`;
+  document.getElementById("createGroupToken").textContent = tokenUrl(result.token);
+  input.value = "";
+});
+
+document.getElementById("copySharedIdBtn").addEventListener("click", async () => {
+  const token = document.getElementById("createGroupResult").dataset.token;
+  try {
+    await navigator.clipboard.writeText(tokenUrl(token));
+    const btn = document.getElementById("copySharedIdBtn");
+    const original = btn.textContent;
+    btn.textContent = "Copied!";
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  } catch {
+    // Clipboard API unavailable (e.g. non-HTTPS) — the link is already
+    // visible in the code box for manual copying.
+  }
+});
+
+document.getElementById("continueToGroupBtn").addEventListener("click", () => {
+  const token = document.getElementById("createGroupResult").dataset.token;
+  tryToken(token);
+});
 
 // ---------- Init ----------
 
